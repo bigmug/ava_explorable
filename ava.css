@@ -1,0 +1,21 @@
+.agent {
+	opacity:1;
+}
+
+.node {
+      stroke: #fff;
+      stroke-width: 1.5px;
+}
+
+.node .yes {
+      stroke: red;
+}
+
+.node .no {
+      stroke: blue;
+}
+
+.link {
+      stroke: #999;
+}
+
