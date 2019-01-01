@@ -1,5 +1,7 @@
 # SLUSH Explorable
 
+![](slush.gif)
+
 # Files
 
 ## index.html
