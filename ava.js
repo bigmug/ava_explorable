@@ -33,7 +33,7 @@ var network_size = {id: "network_size", name: "Network Size", range: [0,200], va
 var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};	
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
 var m_rounds = {id: "rounds", name: "M Rounds", range: [0,10], value: def_rounds};	
-var byzantine_nodes = {id: "rounds", name: "M Rounds", range: [0,200], value: def_byz_nodes};	
+var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,200], value: def_byz_nodes};	
 
 // action parameters for the buttons
 var playpause = { id:"b1", name:"", actions: ["play","pause"], value: 0};
@@ -119,8 +119,14 @@ function resetparameters(){
     rounds = Math.ceil(m_rounds.value);
     byz_nodes = Math.ceil(byzantine_nodes.value);
 
+    byz_node_count = byz_nodes;
     nodes = d3.range(node_count).map( function(d,i) { 
-	return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999" };
+	    if (byz_nodes) {
+		byz_nodes--;
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue" };
+	    } else {
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999" };
+	    }
 	});
 
     node = node.data(nodes).enter().append("circle")
@@ -134,7 +140,7 @@ function resetparameters(){
     q1 = d3.queue();
 }
 
-var source_id = 0;
+var source_id = node_count - 1;
 
 function runsim(){
     if (!initialized) {
