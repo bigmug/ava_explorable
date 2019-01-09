@@ -17,20 +17,23 @@ var node_count = 80,
     L = 128, // world size
     peer_sample = 5,
     alpha = 0.5,
-    rounds = 1;
+    rounds = 1,
+    byz_nodes;
 
 // this are the default values for the slider variables
 var def_node_count = 80,
     def_L = 128, // world size
     def_peer_sample = 5,
     def_alpha = 0.5,
-    def_rounds = 1;
+    def_rounds = 1,
+    def_byz_nodes = 0;
 
 // parameter objects for the sliders
 var network_size = {id: "network_size", name: "Network Size", range: [0,200], value: def_node_count};	
 var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};	
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
 var m_rounds = {id: "rounds", name: "M Rounds", range: [0,10], value: def_rounds};	
+var byzantine_nodes = {id: "rounds", name: "M Rounds", range: [0,200], value: def_byz_nodes};	
 
 // action parameters for the buttons
 var playpause = { id:"b1", name:"", actions: ["play","pause"], value: 0};
@@ -47,7 +50,8 @@ var sliders = [
 	       new widget.slider(network_size).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(kappa).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(alpha_ratio).width(slider_width).trackSize(trackSize).handleSize(handleSize),
-	       new widget.slider(m_rounds).width(slider_width).trackSize(trackSize).handleSize(handleSize)
+	       new widget.slider(m_rounds).width(slider_width).trackSize(trackSize).handleSize(handleSize),
+	       new widget.slider(byzantine_nodes).width(slider_width).trackSize(trackSize).handleSize(handleSize)
 	       ];
 
 // button objects
@@ -113,6 +117,7 @@ function resetparameters(){
     peer_sample = Math.ceil(kappa.value);
     alpha = alpha_ratio.value;
     rounds = Math.ceil(m_rounds.value);
+    byz_nodes = Math.ceil(byzantine_nodes.value);
 
     nodes = d3.range(node_count).map( function(d,i) { 
 	return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999" };
