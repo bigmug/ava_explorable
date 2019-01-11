@@ -34,7 +34,7 @@ var network_size = {id: "network_size", name: "Network Size", range: [0,200], va
 var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};	
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
 var m_rounds = {id: "rounds", name: "M Rounds", range: [0,10], value: def_rounds};	
-var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,200], value: def_byz_nodes};	
+var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,101], value: def_byz_nodes};	
 var network_latency = {id: "latency", name: "Network Latency", range: [0,1], value: def_latency};	
 
 // action parameters for the buttons
@@ -126,6 +126,7 @@ function resetparameters(){
     nodes = d3.range(node_count).map( function(d,i) { 
 	    if (byz_nodes) {
 		byz_nodes--;
+		nodes[i].col = "blue";
 		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue" };
 	    } else {
 		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999" };
@@ -148,11 +149,11 @@ var source_id = node_count - 1;
 function runsim(){
     if (!initialized) {
 	let [init_col, query_loop] = checkState(source_id, "red");
-	console.log(query_loop);
+	//	console.log(query_loop);
 	if (query_loop) {
 	    init_q.defer(query, source_id, init_col);
 	    init_q.await(function(error, query_col) { 
-		    console.log("test");
+		    //		    console.log("test");
 		});
 	}
 	initialized = 1;
@@ -165,7 +166,7 @@ function checkState(node_id, color) {
 	setNodeColor(node_id, color);
 	query_loop = 1;
     }
-    console.log(query_loop);
+    //    console.log(query_loop);
     return [nodes[node_id].col, query_loop];
 }
 
@@ -173,7 +174,7 @@ function query(node_id, color, callback) {
     var t = d3.timeout(function(elapsed) {
 	    for (m = 0; m < rounds; m++) {
 		let tmp_col = sampleNodes(node_id, color);
-		console.log(m + " : " + tmp_col);
+		//		console.log(m + " : " + tmp_col);
 	    }
 	    callback( null, nodes[node_id].col );
 	}, 1500);    
@@ -193,30 +194,31 @@ function sampleNodes(node_id, color, callback) {
 	});
 
     var link = world.append("g").attr("class", "link").selectAll("line");
-    
+    /*
     link = link.data(links).enter().append("line")
 	.attr("x1", function(d) { return X(nodes[d.source].x); })
 	.attr("y1", function(d) { return Y(nodes[d.source].y); })
 	.attr("x2", function(d) { return X(nodes[d.target].x); })
 	.attr("y2", function(d) { return Y(nodes[d.target].y); });
-    
+    */
     var rec_q = d3.queue();
 
     var colors = {"red": 0, "blue": 0};
-    var total = 0;	
-    
     peer_nodes.forEach( function(d) { 
 	    let [sample_col, q_loop] = checkState(d, color);
 	    if (q_loop) {
 		rec_q.defer(query, d, sample_col);
 	    }
 	    colors[sample_col]++;
-	    total++;
 	});
 
     Object.keys(colors).forEach(function(c) {
-	    if ((colors[c] / total >= alpha * peer_sample) && nodes[node_id].col != c) {
+	    if ((colors[c] >= alpha * peer_sample) && nodes[node_id].col != c) {
+		//	    console.log(c + " : " + colors[c] + " : " + alpha * peer_sample);
 		setNodeColor(node_id, c);
+		world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true).classed('remove', function(d,i) { return 1-d; });
+		console.log("SWITCH");
+//.style("fill", nodes[node_id].col);
 	    }
 	});
 

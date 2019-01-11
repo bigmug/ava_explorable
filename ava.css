@@ -19,3 +19,15 @@
       stroke: #999;
 }
 
+.pulse {
+       animation: pulse 2s ease infinite
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.8
+  }
+  100% {
+    opacity: 0
+  }
+}
