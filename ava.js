@@ -194,13 +194,13 @@ function sampleNodes(node_id, color, callback) {
 	});
 
     var link = world.append("g").attr("class", "link").selectAll("line");
-    /*
+    
     link = link.data(links).enter().append("line")
 	.attr("x1", function(d) { return X(nodes[d.source].x); })
 	.attr("y1", function(d) { return Y(nodes[d.source].y); })
 	.attr("x2", function(d) { return X(nodes[d.target].x); })
 	.attr("y2", function(d) { return Y(nodes[d.target].y); });
-    */
+    
     var rec_q = d3.queue();
 
     var colors = {"red": 0, "blue": 0};
