@@ -25,7 +25,7 @@ var def_node_count = 80,
     def_L = 128, // world size
     def_peer_sample = 5,
     def_alpha = 0.5,
-    def_rounds = 1,
+    def_rounds = 3,
     def_byz_nodes = 0,
     def_latency = 0;
 
@@ -148,6 +148,7 @@ var source_id = node_count - 1;
 function runsim(){
     if (!initialized) {
 	let [init_col, query_loop] = checkState(source_id, "red");
+	console.log(query_loop);
 	if (query_loop) {
 	    init_q.defer(query, source_id, init_col);
 	    init_q.await(function(error, query_col) { 
@@ -164,16 +165,16 @@ function checkState(node_id, color) {
 	setNodeColor(node_id, color);
 	query_loop = 1;
     }
+    console.log(query_loop);
     return [nodes[node_id].col, query_loop];
 }
 
 function query(node_id, color, callback) {
-
     var t = d3.timeout(function(elapsed) {
-	    for (m = 0; m < m_rounds; m++) {
-		sampleNodes(node_id, color);
+	    for (m = 0; m < rounds; m++) {
+		let tmp_col = sampleNodes(node_id, color);
+		console.log(m + " : " + tmp_col);
 	    }
-	    //return nodes[node_id].col;
 	    callback( null, nodes[node_id].col );
 	}, 1500);    
 }
@@ -192,26 +193,28 @@ function sampleNodes(node_id, color, callback) {
 	});
 
     var link = world.append("g").attr("class", "link").selectAll("line");
+    
     link = link.data(links).enter().append("line")
 	.attr("x1", function(d) { return X(nodes[d.source].x); })
 	.attr("y1", function(d) { return Y(nodes[d.source].y); })
 	.attr("x2", function(d) { return X(nodes[d.target].x); })
 	.attr("y2", function(d) { return Y(nodes[d.target].y); });
-
+    
     var rec_q = d3.queue();
 
     var colors = {"red": 0, "blue": 0};
     var total = 0;	
     
     peer_nodes.forEach( function(d) { 
-	    let [sample_col, q_loop] = checkState(node_id, color);
+	    let [sample_col, q_loop] = checkState(d, color);
 	    if (q_loop) {
 		rec_q.defer(query, d, sample_col);
 	    }
 	    colors[sample_col]++;
 	    total++;
 	});
-    colors.forEach(function(c) {
+
+    Object.keys(colors).forEach(function(c) {
 	    if ((colors[c] / total >= alpha * peer_sample) && nodes[node_id].col != c) {
 		setNodeColor(node_id, c);
 	    }
@@ -225,7 +228,7 @@ function sampleNodes(node_id, color, callback) {
 	    world.selectAll("line").remove();
 	}, 750);    
 
-    callback( null, nodes[node_id].col );    
+    return nodes[node_id].col;
 }
 
 function setNodeColor(node_id, color) {
