@@ -17,7 +17,7 @@ var node_count = 80,
     L = 128, // world size
     peer_sample = 5,
     alpha = 0.5,
-    rounds = 1,
+    rounds = 5,
     byz_nodes;
 
 // this are the default values for the slider variables
@@ -25,7 +25,7 @@ var def_node_count = 80,
     def_L = 128, // world size
     def_peer_sample = 5,
     def_alpha = 0.5,
-    def_rounds = 3,
+    def_rounds = 5,
     def_byz_nodes = 0,
     def_latency = 0;
 
@@ -216,8 +216,9 @@ function sampleNodes(node_id, color, callback) {
 	    if ((colors[c] >= alpha * peer_sample) && nodes[node_id].col != c) {
 		//	    console.log(c + " : " + colors[c] + " : " + alpha * peer_sample);
 		setNodeColor(node_id, c);
-		world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true).classed('remove', function(d,i) { return 1-d; });
-		console.log("SWITCH");
+		world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
+		console.log("SWITCH : " + node_id);
+
 //.style("fill", nodes[node_id].col);
 	    }
 	});

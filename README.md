@@ -1,6 +1,8 @@
 # SLUSH Explorable
 
-![](slush.gif)
+![](slush.gif)    
+
+![](slush2.gif)
 
 # Files
 

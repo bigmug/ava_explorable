@@ -20,14 +20,17 @@
 }
 
 .pulse {
-       animation: pulse 2s ease infinite
+       animation: pulse 2s ease 1;
 }
 
 @keyframes pulse {
   0% {
     opacity: 0.8
   }
+  50% {
+    opacity: 0.1
+  } 
   100% {
-    opacity: 0
+    opacity: 0.8
   }
 }
