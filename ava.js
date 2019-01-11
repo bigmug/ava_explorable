@@ -26,7 +26,8 @@ var def_node_count = 80,
     def_peer_sample = 5,
     def_alpha = 0.5,
     def_rounds = 1,
-    def_byz_nodes = 0;
+    def_byz_nodes = 0,
+    def_latency = 0;
 
 // parameter objects for the sliders
 var network_size = {id: "network_size", name: "Network Size", range: [0,200], value: def_node_count};	
@@ -34,6 +35,7 @@ var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
 var m_rounds = {id: "rounds", name: "M Rounds", range: [0,10], value: def_rounds};	
 var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,200], value: def_byz_nodes};	
+var network_latency = {id: "latency", name: "Network Latency", range: [0,1], value: def_latency};	
 
 // action parameters for the buttons
 var playpause = { id:"b1", name:"", actions: ["play","pause"], value: 0};
@@ -51,7 +53,8 @@ var sliders = [
 	       new widget.slider(kappa).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(alpha_ratio).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(m_rounds).width(slider_width).trackSize(trackSize).handleSize(handleSize),
-	       new widget.slider(byzantine_nodes).width(slider_width).trackSize(trackSize).handleSize(handleSize)
+	       new widget.slider(byzantine_nodes).width(slider_width).trackSize(trackSize).handleSize(handleSize),
+	       new widget.slider(network_latency).width(slider_width).trackSize(trackSize).handleSize(handleSize)
 	       ];
 
 // button objects
@@ -107,7 +110,7 @@ var t;
 function runpause(d){ d.value() == 1 ? t = d3.interval(runsim,1500) : t.stop(); }
 
 var initialized = 0;
-var q1;
+var init_q;
 
 function resetparameters(){
 
@@ -137,88 +140,97 @@ function resetparameters(){
 	.style("fill", function(d) { return d.col; });
 
     initialized = 0;
-    q1 = d3.queue();
+    init_q = d3.queue();
 }
 
 var source_id = node_count - 1;
 
 function runsim(){
     if (!initialized) {
-	q1.defer(Query, source_id, "red");
-	q1.await(function(error, query_col) { 
-		console.log("test");
-	    });
+	let [init_col, query_loop] = checkState(source_id, "red");
+	if (query_loop) {
+	    init_q.defer(query, source_id, init_col);
+	    init_q.await(function(error, query_col) { 
+		    console.log("test");
+		});
+	}
 	initialized = 1;
     }
 }
 
+function checkState(node_id, color) {
+    let query_loop = 0;
+    if (nodes[node_id].col == "#999") {
+	setNodeColor(node_id, color);
+	query_loop = 1;
+    }
+    return [nodes[node_id].col, query_loop];
+}
 
-function Query(node_id, color, callback) {
+function query(node_id, color, callback) {
 
     var t = d3.timeout(function(elapsed) {
-	    if (nodes[node_id].col == "#999") {
-		nodes[node_id].col = color;
-		world.selectAll("circle").filter(function(d, i){ return i === node_id; }).style("fill", nodes[node_id].col);
-
-		var peer_nodes = sampleNodes();    
-	
-		var red_count = 0;
-		var blue_count = 0;
-		var total = 0;	
-
-		var links = [];
-		peer_nodes.forEach( function(d) { 
-			links.push({"source": node_id, "target": d});
-		    });
-
-		var link = world.append("g").attr("class", "link").selectAll("line");
-		link = link.data(links).enter().append("line")
-		.attr("x1", function(d) { return X(nodes[d.source].x); })
-		.attr("y1", function(d) { return Y(nodes[d.source].y); })
-		.attr("x2", function(d) { return X(nodes[d.target].x); })
-		.attr("y2", function(d) { return Y(nodes[d.target].y); });
-
-		var tmpq = d3.queue();
-		peer_nodes.forEach( function(d) { 
-			tmpq.defer(Query, d, color);
-		    });
-
-		tmpq.awaitAll(function(error, query_col) { 
-			if (error) throw error;
-
-			query_col.forEach(function(c) {
-				if ( c === "red" ) {
-				    red_count++;
-				} else if ( c === "blue") {
-				    blue_count++;
-				}
-				total = red_count + blue_count;
-			    });
-			if ((red_count / total >= alpha * peer_sample) && nodes[node_id].col != "red") {
-			    nodes[node_id].col = "red";
-			    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).style("fill", nodes[node_id].col);
-			} else if ((blue_count / total >= alpha * peer_sample) && nodes[node_id].col != "blue") {
-			    nodes[node_id].col = "blue";
-			    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).style("fill", nodes[node_id].col);
-			}
-			});
-		var t2 = d3.timeout(function(elapsed) {
-			world.selectAll("line").remove();
-		    }, 750);    
-
+	    for (m = 0; m < m_rounds; m++) {
+		sampleNodes(node_id, color);
 	    }
 	    //return nodes[node_id].col;
 	    callback( null, nodes[node_id].col );
 	}, 1500);    
 }
 
-function sampleNodes() {
+function sampleNodes(node_id, color, callback) {
     // choose a random set of nodes to query
     var peer_node_set = new Set();
     while(peer_node_set.size < peer_sample) {
 	peer_node_set.add(getRandomInt(0, node_count - 1));
     }
-    return Array.from(peer_node_set);
+    var peer_nodes = Array.from(peer_node_set);
+
+    var links = [];
+    peer_nodes.forEach( function(d) { 
+	    links.push({"source": node_id, "target": d});
+	});
+
+    var link = world.append("g").attr("class", "link").selectAll("line");
+    link = link.data(links).enter().append("line")
+	.attr("x1", function(d) { return X(nodes[d.source].x); })
+	.attr("y1", function(d) { return Y(nodes[d.source].y); })
+	.attr("x2", function(d) { return X(nodes[d.target].x); })
+	.attr("y2", function(d) { return Y(nodes[d.target].y); });
+
+    var rec_q = d3.queue();
+
+    var colors = {"red": 0, "blue": 0};
+    var total = 0;	
+    
+    peer_nodes.forEach( function(d) { 
+	    let [sample_col, q_loop] = checkState(node_id, color);
+	    if (q_loop) {
+		rec_q.defer(query, d, sample_col);
+	    }
+	    colors[sample_col]++;
+	    total++;
+	});
+    colors.forEach(function(c) {
+	    if ((colors[c] / total >= alpha * peer_sample) && nodes[node_id].col != c) {
+		setNodeColor(node_id, c);
+	    }
+	});
+
+    rec_q.awaitAll(function(error, query_col) { 
+	    if (error) throw error;
+	});
+
+    var t2 = d3.timeout(function(elapsed) {
+	    world.selectAll("line").remove();
+	}, 750);    
+
+    callback( null, nodes[node_id].col );    
+}
+
+function setNodeColor(node_id, color) {
+    nodes[node_id].col = color;
+    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).style("fill", nodes[node_id].col);
 }
 
 function getRandomInt(min, max) {
