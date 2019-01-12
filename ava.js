@@ -14,7 +14,7 @@ var world_width = 400,
 	node_radius = 4;
 
 // fixed parameters 	
-var node_count = 100,
+var node_count = 80,
     L = 128, // world size
     peer_sample = 5,
     alpha = 0.5,
@@ -222,7 +222,9 @@ function checkState(node_id, color) {
     let query_loop = 0;
     if (nodes[node_id].col == "#999") {
 	setNodeColor(node_id, color);
-	query_loop = 1;
+	if (nodes[node_id].q == 0) {
+	    query_loop = 1;
+	}
     }
     return [nodes[node_id].col, query_loop];
 }
