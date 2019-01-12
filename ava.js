@@ -8,7 +8,7 @@ var world_width = 400,
 	button_x = 3 * controlbox_width / 4,
 	button_y =  7* controlbox_height / 8,
 	toggle_x = 300,
-	toggle_y = 280,
+	toggle_y = 140,
 	button_width = 180,
 	slider_width = 180;
 
@@ -18,19 +18,22 @@ var node_count = 80,
     peer_sample = 5,
     alpha = 0.5,
     rounds = 5,
-    byz_nodes;
+    byz_nodes = 10;
 
 // this are the default values for the slider variables
 var def_node_count = 80,
-    def_L = 128, // world size
     def_peer_sample = 5,
     def_alpha = 0.5,
     def_rounds = 5,
-    def_byz_nodes = 0,
+    def_byz_nodes = 10,
     def_latency = 0;
 
+var display_connections = {id:"t1", name: "Display Sampling", value: false}; 
+var loop_simulation = {id:"t2", name: "Loop Simulation", value: false}; 
+var lock_position = {id:"t3", name: "Lock Node Position", value: false}; 
+
 // parameter objects for the sliders
-var network_size = {id: "network_size", name: "Network Size", range: [0,200], value: def_node_count};	
+var network_size = {id: "network_size", name: "Network Size", range: [0,100], value: def_node_count};	
 var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};	
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
 var m_rounds = {id: "rounds", name: "M Rounds", range: [0,10], value: def_rounds};	
@@ -63,14 +66,19 @@ var buttons = [
 	new widget.button(reload).update(resetparameters)
 	       ];
 
+var toggles = [
+       new widget.toggle(display_connections).update(noop).label("top").size(16),
+       new widget.toggle(loop_simulation).update(noop).label("top").size(16),
+       new widget.toggle(lock_position).update(noop).label("top").size(16)
+	       ];
+
+function noop(){
+
+}
+
 // position scales
 var X = d3.scaleLinear().domain([0,L]).range([0,world_width]);
 var Y = d3.scaleLinear().domain([0,L]).range([world_height,0]);
-
-// helps translate degrees and radian
-
-var g2r = d3.scaleLinear().domain([0,360]).range([0,2*Math.PI]);
-var r2g = d3.scaleLinear().range([0,360]).domain([0,2*Math.PI]);
 
 var nodes;
 
@@ -92,16 +100,22 @@ var slider = controls.append("g").attr("id","sliders")
 var button = controls.append("g")
     .attr("transform","translate("+button_x +","+ button_y +")");
 
+var toggle = controls.append("g")
+    .attr("transform","translate("+toggle_x +","+ toggle_y +")");
+
 // sliders and buttons
 slider.selectAll(".slider").data(sliders).enter().append(widget.sliderElement)
 	.attr("transform",function(d,i){return "translate(0,"+sbl.x(i)+")"});
 	
 button.selectAll(".button").data(buttons).enter().append(widget.buttonElement)
-	.attr("transform",function(d,i){return "translate("+(bbl.x(i) - button_width / 2)+",0)"});	
-
+	.attr("transform",function(d,i){return "translate("+(bbl.x(i) - button_width / 2)+",0)"});
+	
+toggle.selectAll(".toggle").data(toggles).enter().append(widget.toggleElement)
+    	.attr("transform",function(d,i){return "translate(0,"+sbl.x(i)+")"});
 /////////////////////////////////////////
 var node = world.append("g").attr("class", "node").selectAll("circle");
-resetparameters();
+initialize();
+//resetparameters();
 
 // timer variable for the simulation
 var t; 
@@ -112,9 +126,7 @@ function runpause(d){ d.value() == 1 ? t = d3.interval(runsim,1500) : t.stop(); 
 var initialized = 0;
 var init_q;
 
-function resetparameters(){
-
-    world.selectAll("circle").remove();
+function initialize() {
     
     node_count = Math.ceil(network_size.value);
     peer_sample = Math.ceil(kappa.value);
@@ -126,19 +138,56 @@ function resetparameters(){
     nodes = d3.range(node_count).map( function(d,i) { 
 	    if (byz_nodes) {
 		byz_nodes--;
-		nodes[i].col = "blue";
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue" };
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0 };
 	    } else {
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999" };
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999", x0: 0, y0: 0 };
 	    }
 	});
-
+    
     node = node.data(nodes).enter().append("circle")
 	.attr("r", 4)
 	.attr("cx", function(d) { return X(d.x); })
 	.attr("cy", function(d) { return Y(d.y); })
 	.attr("id", function(d) { return d.id; })
 	.style("fill", function(d) { return d.col; });
+    
+    initialized = 0;
+    init_q = d3.queue();
+}
+
+function resetparameters() {
+
+    if (typeof(t) === "object") {t.stop()};
+    
+    node_count = Math.ceil(network_size.value);
+    peer_sample = Math.ceil(kappa.value);
+    alpha = alpha_ratio.value;
+    rounds = Math.ceil(m_rounds.value);
+    byz_nodes = Math.ceil(byzantine_nodes.value);
+
+    nodes.forEach( function(d, i) { 
+	    d.id = i;
+	    if (!lock_position.value) {
+		let x = Math.random() * L;
+		d.tx = x - d.x;
+		d.x = x;
+	    
+		let y = Math.random() * L;
+		d.ty = y - d.y;
+		d.y = y;
+	    }
+	    if (byz_nodes) {
+		byz_nodes--;
+		d.col = "blue";
+	    } else {
+		d.col = "#999";
+	    }
+	});
+
+	world.selectAll("circle").transition()
+	    .attr("cx", function(d) { return X(d.x); })
+	    .attr("cy", function(d) { return Y(d.y); })
+	    .style("fill", function(d) { return d.col; });
 
     initialized = 0;
     init_q = d3.queue();
@@ -194,13 +243,15 @@ function sampleNodes(node_id, color, callback) {
 	});
 
     var link = world.append("g").attr("class", "link").selectAll("line");
-    
-    link = link.data(links).enter().append("line")
-	.attr("x1", function(d) { return X(nodes[d.source].x); })
-	.attr("y1", function(d) { return Y(nodes[d.source].y); })
-	.attr("x2", function(d) { return X(nodes[d.target].x); })
-	.attr("y2", function(d) { return Y(nodes[d.target].y); });
-    
+
+    if (display_connections.value) {
+	link = link.data(links).enter().append("line")
+	    .attr("x1", function(d) { return X(nodes[d.source].x); })
+	    .attr("y1", function(d) { return Y(nodes[d.source].y); })
+	    .attr("x2", function(d) { return X(nodes[d.target].x); })
+	    .attr("y2", function(d) { return Y(nodes[d.target].y); });
+    }
+
     var rec_q = d3.queue();
 
     var colors = {"red": 0, "blue": 0};
