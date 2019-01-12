@@ -323,13 +323,13 @@ function sampleNodes(node_id, color, algo) {
 
     rec_q.awaitAll(function(error, query_col) { 
 	    if (error) throw error;
-	    let querying = 0;
-	    nodes.forEach( function(d) {
-		    querying += d.q;
-		});
-	    if (!querying) {
-		buttons[0].click();
-	    }
+	    //	    let querying = 0;
+	    //	    nodes.forEach( function(d) {
+	    //		    querying += d.q;
+	    //		});
+	    //	    if (!querying) {
+	    //		buttons[0].click();
+	    //	    }
 	});
 
     var t2 = d3.timeout(function(elapsed) {
