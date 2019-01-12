@@ -26,6 +26,7 @@ var def_node_count = 80,
     def_peer_sample = 5,
     def_alpha = 0.5,
     def_rounds = 5,
+    def_beta = 5,
     def_byz_nodes = 0.1,
     def_latency = 0;
 
@@ -36,13 +37,17 @@ var lock_position = {id:"t3", name: "Lock Node Position", value: false};
 var network_size = {id: "network_size", name: "Network Size", range: [0,100], value: def_node_count};	
 var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};	
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
-var m_rounds = {id: "rounds", name: "M Rounds", range: [0,10], value: def_rounds};	
+var m_rounds = {id: "rounds", name: "M Rounds", range: [0,100], value: def_rounds};	
+var beta = {id: "beta", name: "Beta", range: [0,100], value: def_beta};	
 var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,1], value: def_byz_nodes};	
 
 // action parameters for the buttons
 var playpause = { id:"b1", name:"", actions: ["play","pause"], value: 0};
 var reload = { id:"b3", name:"", actions: ["reload"], value: 0};
 
+//var consensus_algo = {id: "consensus_ago", name: "Algo", choices: ["Slush", "Snowflake", "Snowball"], value: 0};
+var consensus_algo = {id: "consensus_ago", name: "Algo", choices: ["Slush", "Snowflake"], value: 0};
+	
 // widget.block helps distributing widgets in neat arrays
 var sbl = new widget.block([2,3,1],controlbox_height-controlbox_margin.top-controlbox_margin.bottom,10,"[]");
 var bbl = new widget.block([3],button_width,0,"()");
@@ -51,22 +56,27 @@ var bbl = new widget.block([3],button_width,0,"()");
 var handleSize = 12, trackSize = 8;
 
 var sliders = [
+	       new widget.slider(byzantine_nodes).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(kappa).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(alpha_ratio).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(m_rounds).width(slider_width).trackSize(trackSize).handleSize(handleSize),
-	       new widget.slider(byzantine_nodes).width(slider_width).trackSize(trackSize).handleSize(handleSize)
+	       //	       new widget.slider(beta).width(slider_width).trackSize(trackSize).handleSize(handleSize)
 	       ];
 
 // button objects
 var buttons = [
-	new widget.button(playpause).update(runpause),
-	new widget.button(reload).update(resetparameters)
+	       new widget.button(playpause).update(runpause),
+	       new widget.button(reload).update(resetparameters)
 	       ];
 
 var toggles = [
-       new widget.toggle(display_connections).update(noop).label("top").size(16),
-       new widget.toggle(lock_position).update(noop).label("top").size(16)
+	       new widget.toggle(display_connections).update(noop).label("top").size(16),
+	       new widget.toggle(lock_position).update(noop).label("top").size(16)
 	       ];
+
+var radio_buttons = [
+		     new widget.radio(consensus_algo).update(noop).alignment("horizontal")
+		     ];
 
 function noop(){
 
@@ -99,6 +109,9 @@ var button = controls.append("g")
 var toggle = controls.append("g")
     .attr("transform","translate("+toggle_x +","+ toggle_y +")");
 
+var radio = controls.append("g")
+    .attr("transform","translate("+60+","+ 290 +")");
+
 // sliders and buttons
 slider.selectAll(".slider").data(sliders).enter().append(widget.sliderElement)
 	.attr("transform",function(d,i){return "translate(0,"+sbl.x(i)+")"});
@@ -108,6 +121,9 @@ button.selectAll(".button").data(buttons).enter().append(widget.buttonElement)
 	
 toggle.selectAll(".toggle").data(toggles).enter().append(widget.toggleElement)
     	.attr("transform",function(d,i){return "translate(0,"+sbl.x(i)+")"});
+
+radio.selectAll(".radio").data(radio_buttons).enter().append(widget.radioElement)
+    	.attr("transform",function(d,i){return "translate(0,0)"});
 /////////////////////////////////////////
 var node = world.append("g").attr("class", "node").selectAll("circle");
 initialize();
@@ -122,7 +138,7 @@ var initialized = 0;
 var init_q;
 
 function initialize() {
-    
+
     node_count = Math.ceil(network_size.value);
     peer_sample = Math.ceil(kappa.value);
     alpha = alpha_ratio.value;
@@ -132,9 +148,9 @@ function initialize() {
     nodes = d3.range(node_count).map( function(d,i) { 
 	    if (byz_nodes) {
 		byz_nodes--;
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0, q: 0 };
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0, q: 0, cnt: 0 };
 	    } else {
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999", x0: 0, y0: 0, q: 0 };
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999", x0: 0, y0: 0, q: 0, cnt: 0 };
 	    }
 	});
     
@@ -175,6 +191,7 @@ function resetparameters() {
 
     nodes.forEach( function(d, i) { 
 	    d.id = i;
+	    d.cnt = 0;
 	    if (!lock_position.value) {
 		let x = Math.random() * L;
 		d.tx = x - d.x;
@@ -205,10 +222,10 @@ var source_id = node_count - 1;
 
 function runsim(){
     if (!initialized) {
-	let [init_col, query_loop] = checkState(source_id, "red");
+	let [init_col, query_loop, algo] = checkState(source_id, "red");
 
 	if (query_loop) {
-	    init_q.defer(query, source_id, init_col);
+	    init_q.defer(query, source_id, init_col, algo);
 	    init_q.await(function(error, query_col) { 
 		    if (error) throw error;
 		});
@@ -225,24 +242,33 @@ function checkState(node_id, color) {
 	    query_loop = 1;
 	}
     }
-    return [nodes[node_id].col, query_loop];
+    return [nodes[node_id].col, query_loop, consensus_algo.choices[consensus_algo.value]];
 }
 
-function query(node_id, color, callback) {
+function query(node_id, color, algo, callback) {
 
     nodes[node_id].q = 1;
     var t = d3.timeout(function(elapsed) {
-	    for (m = 0; m < rounds; m++) {
-		let tmp_col = sampleNodes(node_id, color);
-		//		console.log(m + " : " + tmp_col);
+	    if (algo === "Slush") {
+		for (m = 0; m < rounds; m++) {
+		    sampleNodes(node_id, color, algo);
+		}
+	    } else if (algo === "Snowflake") {
+		let undecided = 1;
+		while(undecided) {
+		    undecided = sampleNodes(node_id, color, algo);
+		}
+	    } else if (algo === "Snowball") {
+		console.log(algo);
 	    }
+
 	    nodes[node_id].q = 0;
 
 	    callback( null, nodes[node_id].col );
 	}, 1500);    
 }
 
-function sampleNodes(node_id, color, callback) {
+function sampleNodes(node_id, color, algo) {
     // choose a random set of nodes to query
     var peer_node_set = new Set();
     while(peer_node_set.size < peer_sample) {
@@ -269,17 +295,29 @@ function sampleNodes(node_id, color, callback) {
 
     var colors = {"red": 0, "blue": 0};
     peer_nodes.forEach( function(d) { 
-	    let [sample_col, q_loop] = checkState(d, color);
+	    let [sample_col, q_loop, algo] = checkState(d, color);
 	    if (q_loop) {
-		rec_q.defer(query, d, sample_col);
+		rec_q.defer(query, d, sample_col, algo);
 	    }
 	    colors[sample_col]++;
 	});
 
+    let not_accepted = 1;
+    let use_counter = algo !== "Slush" ? 1 : 0;
     Object.keys(colors).forEach(function(c) {
-	    if ((colors[c] > alpha * peer_sample) && nodes[node_id].col != c) {
-		setNodeColor(node_id, c);
-		world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
+	    if (colors[c] > alpha * peer_sample) {
+		if (nodes[node_id].col != c) {
+		    setNodeColor(node_id, c);
+		    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
+		    if (use_counter) {
+			nodes[node_id].cnt = 0;
+		    }
+		} else if (use_counter) {
+		    nodes[node_id].cnt++;
+		    if (nodes[node_id].cnt >= beta.value) {
+			not_accepted = 0;
+		    }
+		}
 	    }
 	});
 
@@ -296,9 +334,9 @@ function sampleNodes(node_id, color, callback) {
 
     var t2 = d3.timeout(function(elapsed) {
 	    world.selectAll("line").remove();
-	}, 750);    
+	}, 700);    
 
-    return nodes[node_id].col;
+    return not_accepted;
 }
 
 function setNodeColor(node_id, color) {
