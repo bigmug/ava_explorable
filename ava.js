@@ -19,14 +19,14 @@ var node_count = 80,
     peer_sample = 5,
     alpha = 0.5,
     rounds = 5,
-    byz_nodes = 10;
+    byz_nodes = 8;
 
 // this are the default values for the slider variables
 var def_node_count = 80,
     def_peer_sample = 5,
     def_alpha = 0.5,
     def_rounds = 5,
-    def_byz_nodes = 10,
+    def_byz_nodes = 0.1,
     def_latency = 0;
 
 var display_connections = {id:"t1", name: "Display Sampling", value: false}; 
@@ -37,7 +37,7 @@ var network_size = {id: "network_size", name: "Network Size", range: [0,100], va
 var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};	
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
 var m_rounds = {id: "rounds", name: "M Rounds", range: [0,10], value: def_rounds};	
-var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,100], value: def_byz_nodes};	
+var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,1], value: def_byz_nodes};	
 
 // action parameters for the buttons
 var playpause = { id:"b1", name:"", actions: ["play","pause"], value: 0};
@@ -127,9 +127,8 @@ function initialize() {
     peer_sample = Math.ceil(kappa.value);
     alpha = alpha_ratio.value;
     rounds = Math.ceil(m_rounds.value);
-    byz_nodes = Math.ceil(byzantine_nodes.value);
+    byz_nodes = Math.ceil(byzantine_nodes.value * node_count);
 
-    byz_node_count = byz_nodes;
     nodes = d3.range(node_count).map( function(d,i) { 
 	    if (byz_nodes) {
 		byz_nodes--;
@@ -158,7 +157,7 @@ function resetparameters() {
     peer_sample = Math.ceil(kappa.value);
     alpha = alpha_ratio.value;
     rounds = Math.ceil(m_rounds.value);
-    byz_nodes = Math.ceil(byzantine_nodes.value);
+    byz_nodes = Math.ceil(byzantine_nodes.value * node_count);
 
     /*
     if (node_count <= nodes.length) {
@@ -222,7 +221,7 @@ function checkState(node_id, color) {
     let query_loop = 0;
     if (nodes[node_id].col == "#999") {
 	setNodeColor(node_id, color);
-	if (nodes[node_id].q == 0) {
+	if (nodes[node_id].q === 0) {
 	    query_loop = 1;
 	}
     }
@@ -278,10 +277,9 @@ function sampleNodes(node_id, color, callback) {
 	});
 
     Object.keys(colors).forEach(function(c) {
-	    if ((colors[c] >= alpha * peer_sample) && nodes[node_id].col != c) {
+	    if ((colors[c] > alpha * peer_sample) && nodes[node_id].col != c) {
 		setNodeColor(node_id, c);
 		world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
-		//console.log("SWITCH : " + node_id);
 	    }
 	});
 
@@ -292,9 +290,7 @@ function sampleNodes(node_id, color, callback) {
 		    querying += d.q;
 		});
 	    if (!querying) {
-		console.log(buttons[0]);
 		buttons[0].click();
-		console.log("HERE");
 	    }
 	});
 
