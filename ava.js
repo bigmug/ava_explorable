@@ -22,7 +22,7 @@ var node_count = 100,
     byz_nodes = 10;
 
 // this are the default values for the slider variables
-var def_node_count = 100,
+var def_node_count = 80,
     def_peer_sample = 5,
     def_alpha = 0.5,
     def_rounds = 5,
