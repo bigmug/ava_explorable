@@ -13,7 +13,7 @@ var world_width = 400,
 	slider_width = 180;
 
 // fixed parameters 	
-var node_count = 80,
+var node_count = 100,
     L = 128, // world size
     peer_sample = 5,
     alpha = 0.5,
@@ -21,7 +21,7 @@ var node_count = 80,
     byz_nodes = 10;
 
 // this are the default values for the slider variables
-var def_node_count = 80,
+var def_node_count = 100,
     def_peer_sample = 5,
     def_alpha = 0.5,
     def_rounds = 5,
@@ -37,7 +37,7 @@ var network_size = {id: "network_size", name: "Network Size", range: [0,100], va
 var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};	
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
 var m_rounds = {id: "rounds", name: "M Rounds", range: [0,10], value: def_rounds};	
-var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,101], value: def_byz_nodes};	
+var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,100], value: def_byz_nodes};	
 var network_latency = {id: "latency", name: "Network Latency", range: [0,1], value: def_latency};	
 
 // action parameters for the buttons
@@ -52,7 +52,7 @@ var bbl = new widget.block([3],button_width,0,"()");
 var handleSize = 12, trackSize = 8;
 
 var sliders = [
-	       new widget.slider(network_size).width(slider_width).trackSize(trackSize).handleSize(handleSize),
+	       //	       new widget.slider(network_size).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(kappa).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(alpha_ratio).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(m_rounds).width(slider_width).trackSize(trackSize).handleSize(handleSize),
@@ -115,7 +115,6 @@ toggle.selectAll(".toggle").data(toggles).enter().append(widget.toggleElement)
 /////////////////////////////////////////
 var node = world.append("g").attr("class", "node").selectAll("circle");
 initialize();
-//resetparameters();
 
 // timer variable for the simulation
 var t; 
@@ -164,6 +163,20 @@ function resetparameters() {
     alpha = alpha_ratio.value;
     rounds = Math.ceil(m_rounds.value);
     byz_nodes = Math.ceil(byzantine_nodes.value);
+
+    /*
+    if (node_count <= nodes.length) {
+	for (node_id = node_count; node_id < nodes.length; node_id++) {
+	    world.selectAll("circle").filter(function(d, i){ return d.id === node_id; }).remove();
+	}
+	nodes.splice(node_count, nodes.length - node_count);
+    } else {
+	let index = nodes.length;
+	for (node_id = nodes.length; node_id < node_count; node_id++) {
+	    nodes[node_id] = {id: node_id, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0 };
+	}
+	//	world.append("g").attr("class", "node").selectAll("circle").data(nodes[]);
+	}*/
 
     nodes.forEach( function(d, i) { 
 	    d.id = i;
