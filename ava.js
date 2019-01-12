@@ -10,7 +10,8 @@ var world_width = 400,
 	toggle_x = 300,
 	toggle_y = 140,
 	button_width = 180,
-	slider_width = 180;
+	slider_width = 180,
+	node_radius = 4;
 
 // fixed parameters 	
 var node_count = 100,
@@ -29,7 +30,6 @@ var def_node_count = 100,
     def_latency = 0;
 
 var display_connections = {id:"t1", name: "Display Sampling", value: false}; 
-var loop_simulation = {id:"t2", name: "Loop Simulation", value: false}; 
 var lock_position = {id:"t3", name: "Lock Node Position", value: false}; 
 
 // parameter objects for the sliders
@@ -38,7 +38,6 @@ var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
 var m_rounds = {id: "rounds", name: "M Rounds", range: [0,10], value: def_rounds};	
 var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,100], value: def_byz_nodes};	
-var network_latency = {id: "latency", name: "Network Latency", range: [0,1], value: def_latency};	
 
 // action parameters for the buttons
 var playpause = { id:"b1", name:"", actions: ["play","pause"], value: 0};
@@ -52,12 +51,10 @@ var bbl = new widget.block([3],button_width,0,"()");
 var handleSize = 12, trackSize = 8;
 
 var sliders = [
-	       //	       new widget.slider(network_size).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(kappa).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(alpha_ratio).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(m_rounds).width(slider_width).trackSize(trackSize).handleSize(handleSize),
-	       new widget.slider(byzantine_nodes).width(slider_width).trackSize(trackSize).handleSize(handleSize),
-	       new widget.slider(network_latency).width(slider_width).trackSize(trackSize).handleSize(handleSize)
+	       new widget.slider(byzantine_nodes).width(slider_width).trackSize(trackSize).handleSize(handleSize)
 	       ];
 
 // button objects
@@ -68,7 +65,6 @@ var buttons = [
 
 var toggles = [
        new widget.toggle(display_connections).update(noop).label("top").size(16),
-       new widget.toggle(loop_simulation).update(noop).label("top").size(16),
        new widget.toggle(lock_position).update(noop).label("top").size(16)
 	       ];
 
@@ -77,8 +73,8 @@ function noop(){
 }
 
 // position scales
-var X = d3.scaleLinear().domain([0,L]).range([0,world_width]);
-var Y = d3.scaleLinear().domain([0,L]).range([world_height,0]);
+var X = d3.scaleLinear().domain([0,L]).range([node_radius,world_width - node_radius]);
+var Y = d3.scaleLinear().domain([0,L]).range([world_height - node_radius,node_radius]);
 
 var nodes;
 
@@ -137,14 +133,14 @@ function initialize() {
     nodes = d3.range(node_count).map( function(d,i) { 
 	    if (byz_nodes) {
 		byz_nodes--;
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0 };
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0, q: 0 };
 	    } else {
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999", x0: 0, y0: 0 };
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999", x0: 0, y0: 0, q: 0 };
 	    }
 	});
     
     node = node.data(nodes).enter().append("circle")
-	.attr("r", 4)
+	.attr("r", node_radius)
 	.attr("cx", function(d) { return X(d.x); })
 	.attr("cy", function(d) { return Y(d.y); })
 	.attr("id", function(d) { return d.id; })
@@ -211,11 +207,11 @@ var source_id = node_count - 1;
 function runsim(){
     if (!initialized) {
 	let [init_col, query_loop] = checkState(source_id, "red");
-	//	console.log(query_loop);
+
 	if (query_loop) {
 	    init_q.defer(query, source_id, init_col);
 	    init_q.await(function(error, query_col) { 
-		    //		    console.log("test");
+		    if (error) throw error;
 		});
 	}
 	initialized = 1;
@@ -228,16 +224,19 @@ function checkState(node_id, color) {
 	setNodeColor(node_id, color);
 	query_loop = 1;
     }
-    //    console.log(query_loop);
     return [nodes[node_id].col, query_loop];
 }
 
 function query(node_id, color, callback) {
+
+    nodes[node_id].q = 1;
     var t = d3.timeout(function(elapsed) {
 	    for (m = 0; m < rounds; m++) {
 		let tmp_col = sampleNodes(node_id, color);
 		//		console.log(m + " : " + tmp_col);
 	    }
+	    nodes[node_id].q = 0;
+
 	    callback( null, nodes[node_id].col );
 	}, 1500);    
 }
@@ -278,17 +277,23 @@ function sampleNodes(node_id, color, callback) {
 
     Object.keys(colors).forEach(function(c) {
 	    if ((colors[c] >= alpha * peer_sample) && nodes[node_id].col != c) {
-		//	    console.log(c + " : " + colors[c] + " : " + alpha * peer_sample);
 		setNodeColor(node_id, c);
 		world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
-		console.log("SWITCH : " + node_id);
-
-//.style("fill", nodes[node_id].col);
+		//console.log("SWITCH : " + node_id);
 	    }
 	});
 
     rec_q.awaitAll(function(error, query_col) { 
 	    if (error) throw error;
+	    let querying = 0;
+	    nodes.forEach( function(d) {
+		    querying += d.q;
+		});
+	    if (!querying) {
+		console.log(buttons[0]);
+		buttons[0].click();
+		console.log("HERE");
+	    }
 	});
 
     var t2 = d3.timeout(function(elapsed) {
