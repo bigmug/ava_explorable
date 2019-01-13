@@ -19,6 +19,7 @@ var node_count = 80,
     peer_sample = 5,
     alpha = 0.5,
     rounds = 5,
+    beta = 5,
     byz_nodes = 8;
 
 // this are the default values for the slider variables
@@ -37,8 +38,8 @@ var lock_position = {id:"t3", name: "Lock Node Position", value: false};
 var network_size = {id: "network_size", name: "Network Size", range: [0,100], value: def_node_count};	
 var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};	
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
-var m_rounds = {id: "rounds", name: "M Rounds", range: [0,100], value: def_rounds};	
-var beta = {id: "beta", name: "Beta", range: [0,100], value: def_beta};	
+var m_rounds = {id: "rounds", name: "M / Beta", range: [0,100], value: def_rounds};	
+//var beta_threshold = {id: "beta", name: "Beta", range: [0,100], value: def_beta};	
 var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,1], value: def_byz_nodes};	
 
 // action parameters for the buttons
@@ -172,6 +173,8 @@ function resetparameters() {
     peer_sample = Math.ceil(kappa.value);
     alpha = alpha_ratio.value;
     rounds = Math.ceil(m_rounds.value);
+    // Pulling from the same slider as rounds (M / Beta)
+    beta = Math.ceil(m_rounds.value);
     byz_nodes = Math.ceil(byzantine_nodes.value * node_count);
 
     /*
@@ -341,7 +344,7 @@ function sampleNodes(node_id, color, algo) {
 			nodes[node_id].cnt = 0;
 		    } else {
 			nodes[node_id].cnt++;
-			if (nodes[node_id].cnt >= beta.value) {
+			if (nodes[node_id].cnt >= beta) {
 			    not_accepted = 0;
 			}
 		    }
@@ -358,7 +361,7 @@ function sampleNodes(node_id, color, algo) {
 		    }
 		} else if (use_counter) {
 		    nodes[node_id].cnt++;
-		    if (nodes[node_id].cnt >= beta.value) {
+		    if (nodes[node_id].cnt >= beta) {
 			not_accepted = 0;
 		    }
 		}
