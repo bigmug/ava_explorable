@@ -45,8 +45,7 @@ var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,1], v
 var playpause = { id:"b1", name:"", actions: ["play","pause"], value: 0};
 var reload = { id:"b3", name:"", actions: ["reload"], value: 0};
 
-//var consensus_algo = {id: "consensus_ago", name: "Algo", choices: ["Slush", "Snowflake", "Snowball"], value: 0};
-var consensus_algo = {id: "consensus_ago", name: "Algo", choices: ["Slush", "Snowflake"], value: 0};
+var consensus_algo = {id: "consensus_ago", name: "Algo", choices: ["Slush", "Snowflake", "Snowball"], value: 0};
 	
 // widget.block helps distributing widgets in neat arrays
 var sbl = new widget.block([2,3,1],controlbox_height-controlbox_margin.top-controlbox_margin.bottom,10,"[]");
@@ -148,9 +147,9 @@ function initialize() {
     nodes = d3.range(node_count).map( function(d,i) { 
 	    if (byz_nodes) {
 		byz_nodes--;
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0, q: 0, cnt: 0 };
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "blue", con: 0};
 	    } else {
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999", x0: 0, y0: 0, q: 0, cnt: 0 };
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "#999", con: 0};
 	    }
 	});
     
@@ -192,6 +191,10 @@ function resetparameters() {
     nodes.forEach( function(d, i) { 
 	    d.id = i;
 	    d.cnt = 0;
+	    d.confidence.red = 0;
+	    d.confidence.blue = 0;
+	    d.con = 0;
+
 	    if (!lock_position.value) {
 		let x = Math.random() * L;
 		d.tx = x - d.x;
@@ -204,8 +207,10 @@ function resetparameters() {
 	    if (byz_nodes) {
 		byz_nodes--;
 		d.col = "blue";
+		d.lastcol = "blue";
 	    } else {
 		d.col = "#999";
+		d.lastcol = "#999";
 	    }
 	});
 
@@ -242,6 +247,7 @@ function checkState(node_id, color) {
 	    query_loop = 1;
 	}
     }
+
     return [nodes[node_id].col, query_loop, consensus_algo.choices[consensus_algo.value]];
 }
 
@@ -253,14 +259,14 @@ function query(node_id, color, algo, callback) {
 		for (m = 0; m < rounds; m++) {
 		    sampleNodes(node_id, color, algo);
 		}
-	    } else if (algo === "Snowflake") {
+	    } else if (algo === "Snowflake" || algo === "Snowball") {
 		let undecided = 1;
 		while(undecided) {
 		    undecided = sampleNodes(node_id, color, algo);
 		}
-	    } else if (algo === "Snowball") {
-		console.log(algo);
-	    }
+	    } //else if (algo === "Snowball") {
+	    //		console.log(algo);
+	    //	    }
 
 	    nodes[node_id].q = 0;
 
@@ -296,6 +302,9 @@ function sampleNodes(node_id, color, algo) {
     var colors = {"red": 0, "blue": 0};
     peer_nodes.forEach( function(d) { 
 	    let [sample_col, q_loop, algo] = checkState(d, color);
+	    //	    if (sample_col === 'blue') {
+	    //		console.log(sample_col);
+	    //	    }
 	    if (q_loop) {
 		rec_q.defer(query, d, sample_col, algo);
 	    }
@@ -304,9 +313,44 @@ function sampleNodes(node_id, color, algo) {
 
     let not_accepted = 1;
     let use_counter = algo !== "Slush" ? 1 : 0;
+    let use_confidence = algo === "Snowball" ? 1 : 0;
+
     Object.keys(colors).forEach(function(c) {
+
 	    if (colors[c] > alpha * peer_sample) {
-		if (nodes[node_id].col != c) {
+		
+		if (use_confidence) {
+		    if (c === 'red') {
+			nodes[node_id].confidence.red++;
+			if (nodes[node_id].confidence.red > nodes[node_id].con) {
+			    nodes[node_id].con = nodes[node_id].confidence.red;
+			    setNodeColor(node_id, c);
+			    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
+			}
+		    } else {
+			nodes[node_id].confidence.blue++;
+			if (nodes[node_id].confidence.blue > nodes[node_id].con) {
+			    nodes[node_id].con = nodes[node_id].confidence.blue;
+			    setNodeColor(node_id, c);
+			    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
+			}
+		    }
+		    	    
+		    if (c !== nodes[node_id].lastcol) {
+			nodes[node_id].lastcol = c;
+			nodes[node_id].cnt = 0;
+		    } else {
+			nodes[node_id].cnt++;
+			if (nodes[node_id].cnt >= beta.value) {
+			    not_accepted = 0;
+			}
+		    }
+
+		}
+
+
+		
+		else if (nodes[node_id].col != c) {
 		    setNodeColor(node_id, c);
 		    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
 		    if (use_counter) {
