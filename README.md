@@ -1,10 +1,12 @@
-# SLUSH Explorable 
+# AVA EXPLORABLE
 
 https://bigmug.github.io/ava_explorable/    
 
-![](slush.gif)    
-
 ![](slush2.gif)
+
+![](snowball.gif)    
+
+![](snowball2.gif)    
 
 # Files
 
