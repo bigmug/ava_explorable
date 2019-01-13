@@ -217,7 +217,9 @@ function resetparameters() {
 	world.selectAll("circle").transition()
 	    .attr("cx", function(d) { return X(d.x); })
 	    .attr("cy", function(d) { return Y(d.y); })
-	    .style("fill", function(d) { return d.col; });
+	    .style("fill", function(d) { return d.col; })
+	    .attr("class", null);
+
 
     initialized = 0;
     init_q = d3.queue();
@@ -264,9 +266,7 @@ function query(node_id, color, algo, callback) {
 		while(undecided) {
 		    undecided = sampleNodes(node_id, color, algo);
 		}
-	    } //else if (algo === "Snowball") {
-	    //		console.log(algo);
-	    //	    }
+	    }
 
 	    nodes[node_id].q = 0;
 
