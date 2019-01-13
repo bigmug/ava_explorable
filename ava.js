@@ -38,7 +38,7 @@ var lock_position = {id:"t3", name: "Lock Node Position", value: false};
 var network_size = {id: "network_size", name: "Network Size", range: [0,100], value: def_node_count};	
 var kappa = {id: "kappa", name: "Kappa", range: [0,10], value: def_peer_sample};	
 var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};	
-var m_rounds = {id: "rounds", name: "M / Beta", range: [0,100], value: def_rounds};	
+var m_rounds = {id: "rounds", name: "M / Beta", range: [0,20], value: def_rounds};	
 //var beta_threshold = {id: "beta", name: "Beta", range: [0,100], value: def_beta};	
 var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,1], value: def_byz_nodes};	
 
