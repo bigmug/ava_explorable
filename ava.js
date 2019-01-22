@@ -160,8 +160,8 @@ var t;
 // functions for the action buttons
 function runpause(d){ d.value() == 1 ? t = d3.interval(runsim,1500) : t.stop(); }
 
-var initialized = 0;
-var init_q;
+var check_phi = 1;
+var counter = 0;
 
 function initialize() {
 
@@ -202,8 +202,8 @@ function initialize() {
 	.style("fill", function(d) { return d.col; });
 	//	.style("stroke", function(d) { if (d.byz) { return 'black';}  });
     
-    initialized = 0;
-    init_q = d3.queue();
+    check_phi = 1;
+    counter = 0;
 }
 
 function resetparameters() {
@@ -276,20 +276,13 @@ function resetparameters() {
 	    .attr("class", null);
 
 
-    initialized = 0;
-    init_q = d3.queue();
+	check_phi = 1;
+	counter = 0
 }
-
-var source_id = node_count - 1;
-let counter = 0;
 
 function runsim(){
 
     counter++;
-
-    if (correct_colors['blue'] != correct && correct_colors['red'] != correct) {
-	updatePhi(counter);
-    }
 
     world.selectAll("circle")
 	.attr("class", null);
@@ -349,6 +342,12 @@ function runsim(){
 			}
 		});
 	});
+
+    if (check_phi && (correct_colors['blue'] == correct || correct_colors['red'] == correct)) {
+	updatePhi(counter);
+	check_phi = 0;
+    }
+
 
 
 }
