@@ -24,7 +24,10 @@ var node_count = 80,
     correct = node_count - byz_nodes,
     red_frac = 1,
     reds = correct * red_frac,
+    blues = correct - reds,
     algo = 'Snowball';
+
+var correct_colors = {"red": 0, "blue": 0};;
 
 // this are the default values for the slider variables
 var def_node_count = 80,
@@ -158,6 +161,10 @@ function initialize() {
     red_frac = percent_red.value; 
     correct = node_count - byz_nodes;
     reds = Math.ceil(correct * red_frac);
+    blues = correct - reds;
+    correct_colors['reds'] = reds;
+    correct_colors['blues'] = blues;
+
 
 
     nodes = d3.range(node_count).map( function(d,i) { 
@@ -168,7 +175,7 @@ function initialize() {
 		reds--;
 		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "red", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "#999", con: 0, byz: 0};
 	    } else {
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "blue", con: 0, byz: 0};
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "#999", con: 0, byz: 0};
 	    }
 	});
     
@@ -202,7 +209,9 @@ function resetparameters() {
     red_frac = percent_red.value; 
     correct = node_count - byz_nodes;
     reds = Math.ceil(correct * red_frac);
-
+    blues = correct - reds;
+    correct_colors['reds'] = reds;
+    correct_colors['blues'] = blues;
 
     /*
     if (node_count <= nodes.length) {
@@ -238,13 +247,16 @@ function resetparameters() {
 		byz_nodes--;
 		d.col = "#999";
 		d.lastcol = "#999";
+		d.byz = 1;
 	    } else if (reds) {
 		reds--;
 		d.col = "red";
 		d.lastcol = "red";
+		d.byz = 0;
 	    } else {
 		d.col = "blue";
 		d.lastcol = "blue";
+		d.byz = 0;
 	    }
 	});
 
@@ -262,9 +274,21 @@ function resetparameters() {
 var source_id = node_count - 1;
 let counter = 0;
 
+
 function runsim(){
+
+    world.selectAll("circle").transition()
+	.attr("class", null);
+
     nodes.forEach( function(n) { 
 	    let id = n.id;
+
+	    if (nodes[id].byz) {
+		return;
+	    }
+
+	    adversarialStrategy(id);
+
 	    let peer_node_set = new Set();
 	    while(peer_node_set.size < peer_sample) {
 		let sample_id = getRandomInt(0, node_count - 1);
@@ -314,6 +338,32 @@ function runsim(){
 		});
 	});
 
+}
+
+function adversarialStrategy(node_id) {
+
+    let minority = '';
+    let byz_col = '';
+
+    let col = nodes[node_id].col;
+    let minority_color = correct_colors['blue'] > correct_colors['red'] ? 'red' : 'blue';
+
+    // TODO check for at least 1 blue and introduce stalling byz nodes
+
+    // if 50/50 flip color to reset cnt
+    if (correct_colors['blue'] == correct_colors['red']) {
+	byz_col = col == 'red' ? 'blue' : 'red';	
+    // else push to 50/50
+    } else {
+	byz_col = minority;
+    }
+
+    nodes.forEach( function(n) {
+	    if (n.byz) {
+		nodes[n.id].col = byz_col;
+	    }
+	});
+    
 }
 
 function checkState(node_id) {
