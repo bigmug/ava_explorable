@@ -2,12 +2,6 @@
 
 https://bigmug.github.io/ava_explorable/    
 
-![](slush2.gif)
-
-![](snowball.gif)    
-
-![](snowball2.gif)    
-
 # Files
 
 ## index.html

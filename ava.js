@@ -20,7 +20,11 @@ var node_count = 80,
     alpha = 0.5,
     rounds = 5,
     beta = 5,
-    byz_nodes = 8;
+    byz_nodes = 8,
+    correct = node_count - byz_nodes,
+    red_frac = 1,
+    reds = correct * red_frac,
+    algo = 'Snowball';
 
 // this are the default values for the slider variables
 var def_node_count = 80,
@@ -41,6 +45,7 @@ var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};
 var m_rounds = {id: "rounds", name: "M / Beta", range: [0,20], value: def_rounds};	
 //var beta_threshold = {id: "beta", name: "Beta", range: [0,100], value: def_beta};	
 var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,1], value: def_byz_nodes};	
+var percent_red = {id: "red_frac", name: "Percent Red", range: [0,1], value: 1};
 
 // action parameters for the buttons
 var playpause = { id:"b1", name:"", actions: ["play","pause"], value: 0};
@@ -57,10 +62,11 @@ var handleSize = 12, trackSize = 8;
 
 var sliders = [
 	       new widget.slider(byzantine_nodes).width(slider_width).trackSize(trackSize).handleSize(handleSize),
+	       new widget.slider(percent_red).width(slider_width).trackSize(trackSize).handleSize(handleSize),
 	       new widget.slider(kappa).width(slider_width).trackSize(trackSize).handleSize(handleSize),
-	       new widget.slider(alpha_ratio).width(slider_width).trackSize(trackSize).handleSize(handleSize),
-	       new widget.slider(m_rounds).width(slider_width).trackSize(trackSize).handleSize(handleSize),
-	       //	       new widget.slider(beta).width(slider_width).trackSize(trackSize).handleSize(handleSize)
+	       new widget.slider(alpha_ratio).width(slider_width).trackSize(trackSize).handleSize(handleSize)
+	       //new widget.slider(m_rounds).width(slider_width).trackSize(trackSize).handleSize(handleSize),
+
 	       ];
 
 // button objects
@@ -142,15 +148,27 @@ function initialize() {
     node_count = Math.ceil(network_size.value);
     peer_sample = Math.ceil(kappa.value);
     alpha = alpha_ratio.value;
-    rounds = Math.ceil(m_rounds.value);
+    //rounds = Math.ceil(m_rounds.value);
+    algo = consensus_algo.choices[consensus_algo.value];
     byz_nodes = Math.ceil(byzantine_nodes.value * node_count);
+    if (algo == 'Slush') {
+	byz_nodes = 0;
+    }
+
+    red_frac = percent_red.value; 
+    correct = node_count - byz_nodes;
+    reds = Math.ceil(correct * red_frac);
+
 
     nodes = d3.range(node_count).map( function(d,i) { 
 	    if (byz_nodes) {
 		byz_nodes--;
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "blue", con: 0};
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "#999", con: 0, byz: 1};
+	    } else if (reds) {
+		reds--;
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "red", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "#999", con: 0, byz: 0};
 	    } else {
-		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "#999", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "#999", con: 0};
+		return {id: i, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0, q: 0, cnt: 0, confidence: {red:0, blue:0}, lastcol: "blue", con: 0, byz: 0};
 	    }
 	});
     
@@ -172,10 +190,19 @@ function resetparameters() {
     node_count = Math.ceil(network_size.value);
     peer_sample = Math.ceil(kappa.value);
     alpha = alpha_ratio.value;
-    rounds = Math.ceil(m_rounds.value);
+    //rounds = Math.ceil(m_rounds.value);
     // Pulling from the same slider as rounds (M / Beta)
-    beta = Math.ceil(m_rounds.value);
+    //beta = Math.ceil(m_rounds.value);
+    algo = consensus_algo.choices[consensus_algo.value];
     byz_nodes = Math.ceil(byzantine_nodes.value * node_count);
+    if (algo == 'Slush') {
+	byz_nodes = 0;
+    }
+
+    red_frac = percent_red.value; 
+    correct = node_count - byz_nodes;
+    reds = Math.ceil(correct * red_frac);
+
 
     /*
     if (node_count <= nodes.length) {
@@ -209,11 +236,15 @@ function resetparameters() {
 	    }
 	    if (byz_nodes) {
 		byz_nodes--;
-		d.col = "blue";
-		d.lastcol = "blue";
-	    } else {
 		d.col = "#999";
 		d.lastcol = "#999";
+	    } else if (reds) {
+		reds--;
+		d.col = "red";
+		d.lastcol = "red";
+	    } else {
+		d.col = "blue";
+		d.lastcol = "blue";
 	    }
 	});
 
@@ -229,161 +260,64 @@ function resetparameters() {
 }
 
 var source_id = node_count - 1;
+let counter = 0;
 
 function runsim(){
-    if (!initialized) {
-	let [init_col, query_loop, algo] = checkState(source_id, "red");
+    nodes.forEach( function(n) { 
+	    let id = n.id;
+	    let peer_node_set = new Set();
+	    while(peer_node_set.size < peer_sample) {
+		let sample_id = getRandomInt(0, node_count - 1);
+		if (sample_id != id) {
+		    peer_node_set.add(sample_id);
+		}
+	    }
+	    let peer_nodes = Array.from(peer_node_set);	    
 
-	if (query_loop) {
-	    init_q.defer(query, source_id, init_col, algo);
-	    init_q.await(function(error, query_col) { 
-		    if (error) throw error;
+	    let colors = {"red": 0, "blue": 0};
+	    peer_nodes.forEach( function(d) { 
+		    let [sample_col] = checkState(d);
+		    colors[sample_col]++;
 		});
-	}
-	initialized = 1;
-    }
+
+	    Object.keys(colors).forEach(function(c) {
+
+			if (colors[c] > alpha * peer_sample) {
+			    if (algo === "Slush") {
+				if (nodes[id].col != c) {
+				    world.selectAll("circle").filter(function(d, i){ return i === id; }).classed('pulse', true);
+				    setNodeColor(id, c);
+				}
+			    } else if (algo === "Snowflake") {
+				if (nodes[id].col != c) {
+				    nodes[id].cnt = 0;
+				    world.selectAll("circle").filter(function(d, i){ return i === id; }).classed('pulse', true);
+				    setNodeColor(id, c);
+				} else {
+				    nodes[id].cnt++;
+				}
+			    } else if (algo === "Snowball") {
+				nodes[id].confidence[c]++;
+				if (nodes[id].confidence[c] > nodes[id].confidence[ nodes[id].col ]) {
+				    world.selectAll("circle").filter(function(d, i){ return i === id; }).classed('pulse', true);
+				    setNodeColor(id, c);
+				}
+				if ( c != nodes[id].col ) {
+				    nodes[id].lastcol = c;
+				    nodes[id].cnt = 0;
+				} else {
+				    nodes[id].cnt++;
+				}
+			    }
+			}
+		    
+		});
+	});
+
 }
 
-function checkState(node_id, color) {
-    let query_loop = 0;
-    if (nodes[node_id].col == "#999") {
-	setNodeColor(node_id, color);
-	if (nodes[node_id].q === 0) {
-	    query_loop = 1;
-	}
-    }
-
-    return [nodes[node_id].col, query_loop, consensus_algo.choices[consensus_algo.value]];
-}
-
-function query(node_id, color, algo, callback) {
-
-    nodes[node_id].q = 1;
-    var t = d3.timeout(function(elapsed) {
-	    if (algo === "Slush") {
-		for (m = 0; m < rounds; m++) {
-		    sampleNodes(node_id, color, algo);
-		}
-	    } else if (algo === "Snowflake" || algo === "Snowball") {
-		let undecided = 1;
-		while(undecided) {
-		    undecided = sampleNodes(node_id, color, algo);
-		}
-	    }
-
-	    nodes[node_id].q = 0;
-
-	    callback( null, nodes[node_id].col );
-	}, 1500);    
-}
-
-function sampleNodes(node_id, color, algo) {
-    // choose a random set of nodes to query
-    var peer_node_set = new Set();
-    while(peer_node_set.size < peer_sample) {
-	peer_node_set.add(getRandomInt(0, node_count - 1));
-    }
-    var peer_nodes = Array.from(peer_node_set);
-
-    var links = [];
-    peer_nodes.forEach( function(d) { 
-	    links.push({"source": node_id, "target": d});
-	});
-
-    var link = world.append("g").attr("class", "link").selectAll("line");
-
-    if (display_connections.value) {
-	link = link.data(links).enter().append("line")
-	    .attr("x1", function(d) { return X(nodes[d.source].x); })
-	    .attr("y1", function(d) { return Y(nodes[d.source].y); })
-	    .attr("x2", function(d) { return X(nodes[d.target].x); })
-	    .attr("y2", function(d) { return Y(nodes[d.target].y); });
-    }
-
-    var rec_q = d3.queue();
-
-    var colors = {"red": 0, "blue": 0};
-    peer_nodes.forEach( function(d) { 
-	    let [sample_col, q_loop, algo] = checkState(d, color);
-	    //	    if (sample_col === 'blue') {
-	    //		console.log(sample_col);
-	    //	    }
-	    if (q_loop) {
-		rec_q.defer(query, d, sample_col, algo);
-	    }
-	    colors[sample_col]++;
-	});
-
-    let not_accepted = 1;
-    let use_counter = algo !== "Slush" ? 1 : 0;
-    let use_confidence = algo === "Snowball" ? 1 : 0;
-
-    Object.keys(colors).forEach(function(c) {
-
-	    if (colors[c] > alpha * peer_sample) {
-		
-		if (use_confidence) {
-		    if (c === 'red') {
-			nodes[node_id].confidence.red++;
-			if (nodes[node_id].confidence.red > nodes[node_id].con) {
-			    nodes[node_id].con = nodes[node_id].confidence.red;
-			    setNodeColor(node_id, c);
-			    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
-			}
-		    } else {
-			nodes[node_id].confidence.blue++;
-			if (nodes[node_id].confidence.blue > nodes[node_id].con) {
-			    nodes[node_id].con = nodes[node_id].confidence.blue;
-			    setNodeColor(node_id, c);
-			    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
-			}
-		    }
-		    	    
-		    if (c !== nodes[node_id].lastcol) {
-			nodes[node_id].lastcol = c;
-			nodes[node_id].cnt = 0;
-		    } else {
-			nodes[node_id].cnt++;
-			if (nodes[node_id].cnt >= beta) {
-			    not_accepted = 0;
-			}
-		    }
-
-		}
-
-
-		
-		else if (nodes[node_id].col != c) {
-		    setNodeColor(node_id, c);
-		    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).classed('pulse', true);
-		    if (use_counter) {
-			nodes[node_id].cnt = 0;
-		    }
-		} else if (use_counter) {
-		    nodes[node_id].cnt++;
-		    if (nodes[node_id].cnt >= beta) {
-			not_accepted = 0;
-		    }
-		}
-	    }
-	});
-
-    rec_q.awaitAll(function(error, query_col) { 
-	    if (error) throw error;
-	    //	    let querying = 0;
-	    //	    nodes.forEach( function(d) {
-	    //		    querying += d.q;
-	    //		});
-	    //	    if (!querying) {
-	    //		buttons[0].click();
-	    //	    }
-	});
-
-    var t2 = d3.timeout(function(elapsed) {
-	    world.selectAll("line").remove();
-	}, 700);    
-
-    return not_accepted;
+function checkState(node_id) {
+    return [nodes[node_id].col];
 }
 
 function setNodeColor(node_id, color) {
