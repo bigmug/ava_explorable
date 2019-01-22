@@ -5,6 +5,8 @@ var world_width = 400,
 	controlbox_width = 400,
 	controlbox_height = 400,
 	controlbox_margin = {top:40,bottom:20,left:20,right:10},
+        cartoon_x = 4 * controlbox_width / 6,
+	cartoon_y = controlbox_height / 8 + 5,
 	button_x = 3 * controlbox_width / 4,
 	button_y =  7* controlbox_height / 8,
 	toggle_x = 300,
@@ -112,6 +114,10 @@ var controls = d3.selectAll("#ava_controls").append("svg")
 var slider = controls.append("g").attr("id","sliders")
     .attr("transform","translate("+controlbox_margin.left+","+ controlbox_margin.top +")");
 
+var phi_count = controls.append("g")
+    //    .attr("transform","translate("+cartoon_x +","+ cartoon_y +")")
+    .attr("transform","translate("+controlbox_margin.left +","+ sbl.x(5) +")")
+
 var button = controls.append("g")
     .attr("transform","translate("+button_x +","+ button_y +")");
 
@@ -133,6 +139,17 @@ toggle.selectAll(".toggle").data(toggles).enter().append(widget.toggleElement)
 
 radio.selectAll(".radio").data(radio_buttons).enter().append(widget.radioElement)
     	.attr("transform",function(d,i){return "translate(0,0)"});
+
+phi_count.append("rect")
+    .attr("width",button_width)
+    .attr("height",45)
+    .style("fill", function(d) { return 'transparent'; })
+
+phi_count.append("text")
+    .attr("id", "phi_count")
+    .style("fill", function(d) { return 'black'; })
+    .text("Φ = 0");
+
 /////////////////////////////////////////
 var node = world.append("g").attr("class", "node").selectAll("circle");
 initialize();
@@ -194,6 +211,8 @@ function resetparameters() {
     if (typeof(t) === "object") {t.stop()};
 
     world.selectAll("line").remove();
+
+    updatePhi(0);
     
     node_count = Math.ceil(network_size.value);
     peer_sample = Math.ceil(kappa.value);
@@ -205,6 +224,9 @@ function resetparameters() {
     byz_nodes = Math.ceil(byzantine_nodes.value * node_count);
     if (algo == 'Slush') {
 	byz_nodes = 0;
+	slider.selectAll(".slider").filter(function(d, i){ return d.id() === 'byz_nodes'; }).style("fill", function(d) { return '#999'; });
+    } else {
+	slider.selectAll(".slider").filter(function(d, i){ return d.id() === 'byz_nodes'; }).style("fill", function(d) { return 'black'; });
     }
 
     red_frac = percent_red.value; 
@@ -213,20 +235,6 @@ function resetparameters() {
     blues = correct - reds;
     correct_colors['red'] = reds;
     correct_colors['blue'] = blues;
-
-    /*
-    if (node_count <= nodes.length) {
-	for (node_id = node_count; node_id < nodes.length; node_id++) {
-	    world.selectAll("circle").filter(function(d, i){ return d.id === node_id; }).remove();
-	}
-	nodes.splice(node_count, nodes.length - node_count);
-    } else {
-	let index = nodes.length;
-	for (node_id = nodes.length; node_id < node_count; node_id++) {
-	    nodes[node_id] = {id: node_id, "x": Math.random() * L, "y": Math.random() * L, "col": "blue", x0: 0, y0: 0 };
-	}
-	//	world.append("g").attr("class", "node").selectAll("circle").data(nodes[]);
-	}*/
 
     nodes.forEach( function(d, i) { 
 	    d.id = i;
@@ -275,13 +283,17 @@ function resetparameters() {
 var source_id = node_count - 1;
 let counter = 0;
 
-
 function runsim(){
 
     counter++;
-	world.selectAll("circle")
-	    .attr("class", null);
-	world.selectAll("line").remove();
+
+    if (correct_colors['blue'] != correct && correct_colors['red'] != correct) {
+	updatePhi(counter);
+    }
+
+    world.selectAll("circle")
+	.attr("class", null);
+    world.selectAll("line").remove();
 
     nodes.forEach( function(n) { 
 
@@ -421,6 +433,10 @@ function setNodeColor(id, c) {
     nodes[id].col = c;
     world.selectAll("circle").filter(function(d, i){ return i === id; }).style("fill", nodes[id].col);
 
+}
+
+function updatePhi(iterations) {
+    d3.select("#phi_count").text("Φ = " + iterations )
 }
 
 function getRandomInt(min, max) {
