@@ -27,7 +27,7 @@ var node_count = 80,
     blues = correct - reds,
     algo = 'Snowball';
 
-var correct_colors = {"red": 0, "blue": 0};;
+var correct_colors = {"red": 0, "blue": 0};
 
 // this are the default values for the slider variables
 var def_node_count = 80,
@@ -35,7 +35,7 @@ var def_node_count = 80,
     def_alpha = 0.5,
     def_rounds = 5,
     def_beta = 5,
-    def_byz_nodes = 0.1,
+    def_byz_nodes = 0.15,
     def_latency = 0;
 
 var display_connections = {id:"t1", name: "Display Sampling", value: false}; 
@@ -48,13 +48,13 @@ var alpha_ratio = {id: "alpha", name: "Alpha", range: [0,1], value: def_alpha};
 var m_rounds = {id: "rounds", name: "M / Beta", range: [0,20], value: def_rounds};	
 //var beta_threshold = {id: "beta", name: "Beta", range: [0,100], value: def_beta};	
 var byzantine_nodes = {id: "byz_nodes", name: "Byzantine Nodes", range: [0,1], value: def_byz_nodes};	
-var percent_red = {id: "red_frac", name: "Percent Red", range: [0,1], value: 1};
+var percent_red = {id: "red_frac", name: "Percent Red", range: [0,1], value: 0.9};
 
 // action parameters for the buttons
 var playpause = { id:"b1", name:"", actions: ["play","pause"], value: 0};
 var reload = { id:"b3", name:"", actions: ["reload"], value: 0};
 
-var consensus_algo = {id: "consensus_ago", name: "Algo", choices: ["Slush", "Snowflake", "Snowball"], value: 0};
+var consensus_algo = {id: "consensus_ago", name: "Algo", choices: ["Slush", "Snowflake", "Snowball"], value: 1};
 	
 // widget.block helps distributing widgets in neat arrays
 var sbl = new widget.block([2,3,1],controlbox_height-controlbox_margin.top-controlbox_margin.bottom,10,"[]");
@@ -162,10 +162,8 @@ function initialize() {
     correct = node_count - byz_nodes;
     reds = Math.ceil(correct * red_frac);
     blues = correct - reds;
-    correct_colors['reds'] = reds;
-    correct_colors['blues'] = blues;
-
-
+    correct_colors['red'] = reds;
+    correct_colors['blue'] = blues;
 
     nodes = d3.range(node_count).map( function(d,i) { 
 	    if (byz_nodes) {
@@ -185,6 +183,7 @@ function initialize() {
 	.attr("cy", function(d) { return Y(d.y); })
 	.attr("id", function(d) { return d.id; })
 	.style("fill", function(d) { return d.col; });
+	//	.style("stroke", function(d) { if (d.byz) { return 'black';}  });
     
     initialized = 0;
     init_q = d3.queue();
@@ -193,6 +192,8 @@ function initialize() {
 function resetparameters() {
 
     if (typeof(t) === "object") {t.stop()};
+
+    world.selectAll("line").remove();
     
     node_count = Math.ceil(network_size.value);
     peer_sample = Math.ceil(kappa.value);
@@ -210,8 +211,8 @@ function resetparameters() {
     correct = node_count - byz_nodes;
     reds = Math.ceil(correct * red_frac);
     blues = correct - reds;
-    correct_colors['reds'] = reds;
-    correct_colors['blues'] = blues;
+    correct_colors['red'] = reds;
+    correct_colors['blue'] = blues;
 
     /*
     if (node_count <= nodes.length) {
@@ -277,10 +278,13 @@ let counter = 0;
 
 function runsim(){
 
-    world.selectAll("circle").transition()
-	.attr("class", null);
+    counter++;
+	world.selectAll("circle")
+	    .attr("class", null);
+	world.selectAll("line").remove();
 
     nodes.forEach( function(n) { 
+
 	    let id = n.id;
 
 	    if (nodes[id].byz) {
@@ -300,62 +304,59 @@ function runsim(){
 
 	    let colors = {"red": 0, "blue": 0};
 	    peer_nodes.forEach( function(d) { 
-		    let [sample_col] = checkState(d);
+		    let sample_col = checkState(d);
 		    colors[sample_col]++;
 		});
+
+	    if (display_connections.value) {
+		var links = [];
+		peer_nodes.forEach( function(d) { 
+			links.push({"source": id, "target": d});
+		    });
+
+		var link = world.append("g").attr("class", "link").selectAll("line");
+		link = link.data(links).enter().append("line")
+		    .attr("x1", function(d) { return X(nodes[d.source].x); })
+		    .attr("y1", function(d) { return Y(nodes[d.source].y); })
+		    .attr("x2", function(d) { return X(nodes[d.target].x); })
+		    .attr("y2", function(d) { return Y(nodes[d.target].y); });
+	    }
 
 	    Object.keys(colors).forEach(function(c) {
 
 			if (colors[c] > alpha * peer_sample) {
-			    if (algo === "Slush") {
-				if (nodes[id].col != c) {
-				    world.selectAll("circle").filter(function(d, i){ return i === id; }).classed('pulse', true);
-				    setNodeColor(id, c);
-				}
-			    } else if (algo === "Snowflake") {
-				if (nodes[id].col != c) {
-				    nodes[id].cnt = 0;
-				    world.selectAll("circle").filter(function(d, i){ return i === id; }).classed('pulse', true);
-				    setNodeColor(id, c);
-				} else {
-				    nodes[id].cnt++;
-				}
-			    } else if (algo === "Snowball") {
-				nodes[id].confidence[c]++;
-				if (nodes[id].confidence[c] > nodes[id].confidence[ nodes[id].col ]) {
-				    world.selectAll("circle").filter(function(d, i){ return i === id; }).classed('pulse', true);
-				    setNodeColor(id, c);
-				}
-				if ( c != nodes[id].col ) {
-				    nodes[id].lastcol = c;
-				    nodes[id].cnt = 0;
-				} else {
-				    nodes[id].cnt++;
-				}
-			    }
+
+			    switch (algo) {
+			    case "Slush": slushUpdate(id, c);
+				break;
+			    case "Snowflake": snowflakeUpdate(id, c);
+				break;
+			    case "Snowball": snowballUpdate(id, c);
+				break;
+			    } 
 			}
-		    
 		});
 	});
 
+
 }
 
-function adversarialStrategy(node_id) {
+function adversarialStrategy(id) {
 
-    let minority = '';
     let byz_col = '';
 
-    let col = nodes[node_id].col;
+    let col = nodes[id].col;
     let minority_color = correct_colors['blue'] > correct_colors['red'] ? 'red' : 'blue';
 
-    // TODO check for at least 1 blue and introduce stalling byz nodes
-
+    // Prevent forging transactions, need at least 1 conflict
+    if (correct_colors['blue'] == correct || correct_colors['red'] == correct) {
+	byz_col = col;
     // if 50/50 flip color to reset cnt
-    if (correct_colors['blue'] == correct_colors['red']) {
+    } else if (correct_colors['blue'] == correct_colors['red']) {
 	byz_col = col == 'red' ? 'blue' : 'red';	
     // else push to 50/50
     } else {
-	byz_col = minority;
+	byz_col = minority_color;
     }
 
     nodes.forEach( function(n) {
@@ -366,13 +367,60 @@ function adversarialStrategy(node_id) {
     
 }
 
-function checkState(node_id) {
-    return [nodes[node_id].col];
+function slushUpdate(id, c) {
+    if (nodes[id].col != c) {
+	world.selectAll("circle").filter(function(d, i){ return i === id; }).classed('pulse', true);
+	setNodeColor(id, c);
+    }
 }
 
-function setNodeColor(node_id, color) {
-    nodes[node_id].col = color;
-    world.selectAll("circle").filter(function(d, i){ return i === node_id; }).style("fill", nodes[node_id].col);
+function snowflakeUpdate(id, c) {
+    if (nodes[id].col != c) {
+	nodes[id].cnt = 0;
+	world.selectAll("circle").filter(function(d, i){ return i === id; }).classed('pulse', true);
+	setNodeColor(id, c);
+    } else {
+	nodes[id].cnt++;
+    }
+}
+
+function snowballUpdate(id, c) {
+    nodes[id].confidence[c]++;
+    if (nodes[id].confidence[c] > nodes[id].confidence[ nodes[id].col ]) {
+	world.selectAll("circle").filter(function(d, i){ return i === id; }).classed('pulse', true);
+	setNodeColor(id, c);
+    }
+    if ( nodes[id].col != c ) {
+	nodes[id].lastcol = c;
+	nodes[id].cnt = 0;
+    } else {
+	nodes[id].cnt++;
+    }
+}
+
+function checkState(id) {
+    return nodes[id].col;
+}
+
+function adjustCounts(c) {
+    if (c === 'red') {
+	correct_colors['red']++;
+	correct_colors['blue']--;
+    } else {
+	correct_colors['blue']++;
+	correct_colors['red']--;
+    }
+}
+
+function setNodeColor(id, c) {
+    
+    if (nodes[id].col !== c) {
+	adjustCounts(c);
+    }
+
+    nodes[id].col = c;
+    world.selectAll("circle").filter(function(d, i){ return i === id; }).style("fill", nodes[id].col);
+
 }
 
 function getRandomInt(min, max) {
